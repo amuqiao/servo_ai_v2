@@ -20,3 +20,7 @@ dev-dependencies = [
     "ruff>=0.6.2",
     "fastapi-cli>=0.0.5",
 ]
+
+[[tool.uv.index]]
+url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
+default = true
