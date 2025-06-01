@@ -20,7 +20,7 @@ class LogConfig(BaseSettings):
     class Config:
         env_file = ".env"  # 指定从.env文件加载配置
         env_file_encoding = "utf-8"
-        extra = "allow"  #  允许额外的字段
+        extra = "ignore"  #  忽略额外字段
 
 
 def setup_logging(
