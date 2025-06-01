@@ -1,9 +1,11 @@
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
+from src.configs.config import ApiConfig, get_config
 from src.configs.logging_config import (
     LogConfig,
     setup_logging,
 )
+
 # 导入路由模块（统一管理各功能路由）
 from src.routers import user_router, items_router
 
@@ -17,8 +19,17 @@ app.include_router(user_router)
 app.include_router(items_router)
 
 # 配置日志（初始化根 logger 和模块 logger 的处理器）
-config = LogConfig(LOGGING_LEVEL=logging.INFO)
 setup_logging(app)
+
+
+@app.get("/config")
+async def get_app_config(config: ApiConfig = Depends(get_config)):
+    """示例接口：返回日志配置"""
+    return {
+        "project_name": config.project_name,
+        "database": config.database,
+    }
+
 
 @app.get("/")
 async def root():

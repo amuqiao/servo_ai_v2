@@ -1,31 +1,38 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
+
+class DatabaseConfig(BaseSettings):
+    """数据库模块配置（映射.env中DB_前缀的环境变量）"""
+
+    host: str = Field("localhost", alias="DB_HOST")
+    port: int = Field(3306, alias="DB_PORT")
+    user: str = Field("root", alias="DB_USER")
+    password: str = Field("root", alias="DB_PASSWORD")
+    db_name: str = Field("servo_ai", alias="DB_NAME")
+
+
 class ApiConfig(BaseSettings):
-    
-    DIFY_BASE_URL: str = Field(..., env="DIFY_BASE_URL")  # 例：http://xuntian-ai-sit.tclpv.com
-    DIFY_API_KEY: str = Field(..., env="DIFY_API_KEY")   # 例：app-FpC7jmVhoS90BTUSfCxsm0gG
-    DIFY_TIMEOUT: int = Field(default=180, env="DIFY_TIMEOUT")  # 超时时间，单位秒
-    DIDY_OCR_BASE_URL: str = Field(..., env="DIDY_OCR_BASE_URL")
-    ROOT_DIR: str = Field(default='./', env='ROOT_DIR')
-    DB_HOST: str = Field(default='mysql', env='DB_HOST')
-    DB_PORT: int = Field(default=3306, env='DB_PORT')
-    DB_USER: str = Field(default='root', env='DB_USER')
-    DB_PASSWORD: str = Field(env='DB_PASSWORD')
-    DB_NAME: str = Field(env='DB_NAME')
-    
-    REDIS_HOST: str = Field(env='REDIS_HOST')
-    REDIS_PORT: int = Field(env='REDIS_PORT')
-    REDIS_PASSWORD: str = Field(default="", env='REDIS_PASSWORD')
-    REDIS_DB: int = Field(default=0, env='REDIS_DB')
-    REDIS_MODE: str = Field(default='single', env='REDIS_MODE')
-    CELERY_BROKER_URL: str = Field(env='CELERY_BROKER_URL')
-    CELERY_RESULT_BACKEND: str = Field(env='CELERY_RESULT_BACKEND')
-    # 扫描Redis任务的间隔时间（单位：秒）
-    CELERY_SCAN_TASKS_INTERVAL: float = Field(default=10.0, env="CELERY_SCAN_TASKS_INTERVAL")  
-    
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        env_prefix = ""
-        extra = "allow"
+    """项目全局配置类（整合各模块配置，从.env文件加载环境变量）"""
+
+    project_name: str = Field("servo_ai", alias="COMPOSE_PROJECT_NAME")
+    # 使用default_factory动态创建实例（每次ApiConfig实例化时重新加载.env）
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+
+    model_config = SettingsConfigDict(
+        env_file=".env",          # 环境变量文件路径（项目根目录下的.env）
+        env_file_encoding="utf-8", # 环境文件编码格式
+        extra="allow"             # 允许未显式定义的环境变量（保留扩展性）
+    )
+
+
+def get_config() -> ApiConfig:
+    """依赖项：返回全局配置实例（每次调用生成新实例）"""
+    return ApiConfig()
+
+
+if __name__ == "__main__":
+    # 测试配置加载（验证是否正确读取.env中的最新值）
+    config = ApiConfig()
+    print(f"项目名称: {config.project_name}")
+    print(f"数据库主机: {config.database.host}")  # 预期输出.env中的DB_HOST值
