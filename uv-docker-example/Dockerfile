@@ -31,4 +31,6 @@ ENTRYPOINT []
 # Run the FastAPI application by default
 # Uses `fastapi dev` to enable hot-reloading when the `watch` sync occurs
 # Uses `--host 0.0.0.0` to allow access from outside the container
-CMD ["fastapi", "dev", "--host", "0.0.0.0", "src/uv_docker_example"]
+# CMD ["fastapi", "dev", "--host", "0.0.0.0", "src/uv_docker_example/main.py"]
+
+CMD ["uvicorn", "src.uv_docker_example.main:app", "--host", "0.0.0.0", "--port", "8000"]
