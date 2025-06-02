@@ -7,7 +7,7 @@ from src.configs.logging_config import (
 )
 
 # 导入路由模块（统一管理各功能路由）
-from src.routers import user_router, items_router
+from src.routers import user_router, items_router, redis_crud_router
 
 # 创建模块级别的 logger（名称为当前模块名）
 logger = logging.getLogger(__name__)
@@ -17,6 +17,7 @@ app = FastAPI(title="My FastAPI Service")
 # 注册路由（将用户管理、物品管理路由挂载到主应用）
 app.include_router(user_router)
 app.include_router(items_router)
+app.include_router(redis_crud_router)
 
 # 配置日志（初始化根 logger 和模块 logger 的处理器）
 setup_logging(app)
@@ -28,13 +29,14 @@ async def get_app_config(config: ApiConfig = Depends(get_config)):
     return {
         "project_name": config.project_name,
         "database": config.database,
+        "redis": config.redis,
     }
 
 
 @app.get("/")
 async def root():
     logger.info("访问根路径 /")
-    return "Hello world"
+    return "Hello world1"
 
 
 @app.get("/hello")

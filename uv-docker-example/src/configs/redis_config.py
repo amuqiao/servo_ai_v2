@@ -14,14 +14,15 @@ def get_redis_pool() -> ConnectionPool:
     if _redis_pool is None:
         config = ApiConfig()
         try:
+            # 调整：通过 config.redis 获取 Redis 配置（与 config.py 新增的 RedisConfig 对应）
             _redis_pool = ConnectionPool(
-                host=config.REDIS_HOST,
-                port=config.REDIS_PORT,
-                password=config.REDIS_PASSWORD,
-                db=config.REDIS_DB,
+                host=config.redis.host,  # 原 config.REDIS_HOST → config.redis.host
+                port=config.redis.port,  # 原 config.REDIS_PORT → config.redis.port
+                password=config.redis.password,  # 原 config.REDIS_PASSWORD → config.redis.password
+                db=config.redis.db,  # 原 config.REDIS_DB → config.redis.db
                 decode_responses=True  # 自动解码为字符串
             )
-            logger.debug(f"Redis 连接池初始化成功（host={config.REDIS_HOST}:{config.REDIS_PORT}）")
+            logger.debug(f"Redis 连接池初始化成功（host={config.redis.host}:{config.redis.port}）")  # 同步日志信息
         except Exception as e:
             logger.error(f"Redis 连接池创建失败: {str(e)}")
             raise HTTPException(status_code=500, detail="Redis 连接池初始化失败")
