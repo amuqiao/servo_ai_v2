@@ -8,7 +8,9 @@ dependencies = [
     "fastapi[standard]>=0.112.2",
     "psycopg[binary]>=3.2.9",
     "pydantic-settings>=2.9.1",
+    "pymysql>=1.1.1",
     "redis>=6.2.0",
+    "sqlalchemy>=2.0.41",
 ]
 
 [build-system]

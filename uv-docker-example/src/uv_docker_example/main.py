@@ -1,10 +1,9 @@
 import logging
 from fastapi import FastAPI, Depends
 from src.configs.config import ApiConfig, get_config
-from src.configs.logging_config import (
-    LogConfig,
-    setup_logging,
-)
+from fastapi.middleware.cors import CORSMiddleware
+from src.configs.logging_config import setup_logging
+
 
 # 导入路由模块（统一管理各功能路由）
 from src.routers import user_router, items_router, redis_crud_router
@@ -13,6 +12,15 @@ from src.routers import user_router, items_router, redis_crud_router
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="My FastAPI Service")
+
+# CORS中间件（生产环境需限制具体源）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 允许所有源（开发用）
+    allow_credentials=True,
+    allow_methods=["*"],  # 允许所有HTTP方法
+    allow_headers=["*"],  # 允许所有请求头
+)
 
 # 注册路由（将用户管理、物品管理路由挂载到主应用）
 app.include_router(user_router)

@@ -28,19 +28,26 @@ class RedisConfig(BaseSettings):
     db: int = Field(0, alias="REDIS_DB", description="Redis 数据库编号")
 
 
-class ApiConfig(BaseSettings):
-    """项目全局配置类（整合各模块配置，从.env文件加载环境变量）"""
+# 新增：PostgreSQL 独立配置类（映射.env中POSTGRES_前缀的环境变量）
+class PostgresConfig(BaseSettings):
+    """PostgreSQL模块配置（映射.env中POSTGRES_前缀的环境变量）"""
+    host: str = Field("localhost", alias="POSTGRES_HOST")
+    port: int = Field(5432, alias="POSTGRES_PORT")  # PostgreSQL默认端口5432
+    user: str = Field("postgres", alias="POSTGRES_USER")
+    password: str = Field("123456", alias="POSTGRES_PASSWORD")
+    db_name: str = Field("servo_ai_pg", alias="POSTGRES_DB_NAME")
 
+class ApiConfig(BaseSettings):
+    """项目全局配置类（整合各模块配置）"""
     project_name: str = Field("servo_ai", alias="COMPOSE_PROJECT_NAME")
-    # 使用default_factory动态创建实例（每次ApiConfig实例化时重新加载.env）
-    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
-    # 新增：整合Redis配置（与database字段结构一致）
-    redis: RedisConfig = Field(default_factory=RedisConfig)
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)  # MySQL配置
+    redis: RedisConfig = Field(default_factory=RedisConfig)          # Redis配置
+    postgres: PostgresConfig = Field(default_factory=PostgresConfig)  # 新增：PostgreSQL配置
 
     model_config = SettingsConfigDict(
-        env_file=".env",  # 环境变量文件路径（项目根目录下的.env）
-        env_file_encoding="utf-8",  # 环境文件编码格式
-        extra="allow",  # 允许未显式定义的环境变量（保留扩展性）
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="allow"
     )
 
 

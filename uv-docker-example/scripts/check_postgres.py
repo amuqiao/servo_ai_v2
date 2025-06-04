@@ -36,4 +36,5 @@ def check_postgres_connection():
         return False
 
 if __name__ == "__main__":
+    # python e:/github_project/servo_ai_v2_project/servo_ai_v2/uv-docker-example/scripts/check_postgres.py
     check_postgres_connection()
