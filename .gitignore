@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+
+# 忽略 docker/volumes/postgres 目录下的所有文件（保留目录）
+docker/volumes/postgres/*
+!docker/volumes/postgres/  # 不忽略目录本身（需配合 .gitkeep 确保目录被跟踪）
+
+# 忽略 docker/volumes/redis 目录下的所有文件（保留目录）
+docker/volumes/redis/*
+!docker/volumes/redis/
