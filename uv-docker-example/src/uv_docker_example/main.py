@@ -6,7 +6,7 @@ from src.configs.logging_config import setup_logging
 
 
 # 导入路由模块（统一管理各功能路由）
-from src.routers import user_router, items_router, redis_crud_router
+from src.routers import user_router, items_router, redis_crud_router, celery_demo_router
 
 # 创建模块级别的 logger（名称为当前模块名）
 logger = logging.getLogger(__name__)
@@ -26,6 +26,7 @@ app.add_middleware(
 app.include_router(user_router)
 app.include_router(items_router)
 app.include_router(redis_crud_router)
+app.include_router(celery_demo_router)
 
 # 配置日志（初始化根 logger 和模块 logger 的处理器）
 setup_logging(app)

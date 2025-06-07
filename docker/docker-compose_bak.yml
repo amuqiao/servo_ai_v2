@@ -1,0 +1,139 @@
+version: '3.8'
+
+# 自定义网络（确保服务间通信）
+networks:
+  servo_ai_v2_network:
+    driver: bridge
+
+# 卷定义（持久化存储）
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/volumes/postgres  # Windows路径：e:/github_project/servo_ai_v2_project/servo_ai_v2/docker/volumes/postgres
+      o: bind
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/volumes/redis    # Windows路径：e:/github_project/servo_ai_v2_project/servo_ai_v2/docker/volumes/redis
+      o: bind
+
+services:
+  # PostgreSQL 数据库服务（优化后）
+  db:
+    image: postgres:15-alpine # 轻量镜像，生产建议调整为官方最新稳定版
+    networks:
+      - servo_ai_v2_network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # 挂载数据卷
+    environment:
+      PGUSER: ${PGUSER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123456}
+      POSTGRES_DB: ${POSTGRES_DB:-iot_platform}
+      PGDATA: ${PGDATA:-/var/lib/postgresql/data/pgdata} # PostgreSQL 服务会读取该环境变量并将数据写入指定路径
+    command: >
+      postgres -c 'max_connections=${POSTGRES_MAX_CONNECTIONS:-100}'
+               -c 'shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}'
+               -c 'work_mem=${POSTGRES_WORK_MEM:-8MB}'
+               -c 'maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-128MB}'
+               -c 'effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-1024MB}'
+    ports:
+      - "5432:5432" # 映射到宿主机，方便本地工具连接（可选）
+    restart: no
+    healthcheck:
+      # 添加健康检查（dify风格）
+      test: [ "CMD", "pg_isready" ]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  # Redis 缓存服务（优化后）
+  redis:
+    image: redis:7-alpine # 轻量镜像
+    networks:
+      - servo_ai_v2_network
+    volumes:
+      - redis_data:/data   # 挂载数据卷（Redis默认持久化到/data）
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:-123456} # 与redis-cli兼容的认证变量（dify风格）
+    command: redis-server --requirepass ${REDIS_PASSWORD:-123456} --appendonly yes --bind 0.0.0.0 # 明确绑定IPv4所有接口（可选修改）
+    ports:
+      - "6379:6379" # 映射到宿主机（可选）
+    restart: no
+    healthcheck:
+      # 添加健康检查（dify风格）
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  # 新增：uv-docker-example FastAPI服务
+  fastapi:
+    build:
+      context: ../uv-docker-example  # 指向uv-docker-example代码目录（相对于docker-compose.yml的路径）
+      dockerfile: Dockerfile         # 使用现有Dockerfile
+    networks:
+      - servo_ai_v2_network          # 加入同一网络，与db/redis通信
+    env_file:
+      - .env                         # 读取统一配置文件
+    ports:
+      - "8000:8000"                  # 暴露FastAPI端口到宿主机
+    depends_on:
+      db:
+        condition: service_healthy   # 依赖db服务健康后启动
+      redis:
+        condition: service_healthy   # 依赖redis服务健康后启动
+    restart: no
+
+  # 新增：Celery Worker 服务（执行任务）
+  celery-worker:
+    build:
+      context: ../uv-docker-example  # 与fastapi共享代码目录
+      dockerfile: Dockerfile         # 共享构建配置
+    networks:
+      - servo_ai_v2_network          # 加入同一网络
+    env_file:
+      - .env                         # 读取统一配置
+    command: celery -A uv_docker_example.main worker --loglevel=info  # 启动Worker（根据实际项目结构调整模块路径）
+    depends_on:
+      db:
+        condition: service_healthy   # 依赖数据库健康
+      redis:
+        condition: service_healthy   # 依赖缓存健康
+    restart: no
+
+  # 新增：Celery Beat 服务（定时任务调度）
+  celery-beat:
+    build:
+      context: ../uv-docker-example
+      dockerfile: Dockerfile
+    networks:
+      - servo_ai_v2_network
+    env_file:
+      - .env
+    command: celery -A uv_docker_example.main beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler  # 启动Beat（如需数据库存储定时任务）
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: no
+
+  # 新增：Celery Flower 监控服务
+  flower:
+    build:
+      context: ../uv-docker-example  # 与 Celery 服务共享代码目录
+      dockerfile: Dockerfile         # 共享构建配置
+    networks:
+      - servo_ai_v2_network          # 加入同一网络
+    env_file:
+      - .env                         # 读取统一配置
+    command: celery -A uv_docker_example.main flower --loglevel=info --port=5555  # 启动 Flower 监控（指定 Celery 应用路径）
+    ports:
+      - "5555:5555"                  # 暴露 Flower 端口到宿主机（默认 5555）
+    depends_on:
+      redis:
+        condition: service_healthy   # 依赖 Redis 服务健康（Flower 通过 Redis 监控任务）
+    restart: no

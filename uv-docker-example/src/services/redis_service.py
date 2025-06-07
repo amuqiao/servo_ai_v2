@@ -1,7 +1,8 @@
 from redis import Redis
-from src.exceptions.redis_exceptions import RedisException, RedisErrorCode  # 新增导入
+from src.exceptions.redis_exceptions import RedisException, RedisErrorCode
 
-class RedisCRUDService:
+# 重命名为 RedisService（移除冗余的 CRUD 后缀）
+class RedisBaseService:
     @staticmethod
     def create_key(redis_client: Redis, key: str, value: str) -> bool:
         """创建键值对"""
@@ -35,3 +36,42 @@ class RedisCRUDService:
             return redis_client.delete(key)  # 0（未删除）或1（已删除）
         except Exception as e:
             raise RedisException(RedisErrorCode.OPERATION_FAILED, f"删除键失败: {str(e)}")
+
+    @staticmethod
+    def scan_keys(redis_client: Redis, match_pattern: str = "*", count: int = 100) -> list[str]:
+        """
+        通用扫描键方法（替代原RedisTaskService的scan_ocr_tasks）
+        :param redis_client: Redis客户端实例
+        :param match_pattern: 匹配模式（如"demo_task_*"）
+        :param count: 每次扫描的最大返回数
+        :return: 匹配的键列表（字符串形式）
+        """
+        try:
+            cursor = '0'
+            keys = []
+            while True:
+                cursor, batch = redis_client.scan(cursor=cursor, match=match_pattern, count=count)
+                keys.extend(batch)
+                if cursor == 0:  # 扫描完成
+                    break
+            # 修复：仅对字节类型的键解码，字符串类型直接保留（调整判断顺序避免误操作）
+            return [key.decode('utf-8') if isinstance(key, bytes) else key for key in keys]
+        except Exception as e:
+            raise RedisException(RedisErrorCode.OPERATION_FAILED, f"扫描键失败: {str(e)}")
+
+    @staticmethod
+    def get_and_delete_key(redis_client: Redis, key: str) -> str:
+        """
+        原子操作：获取并删除键（替代原RedisTaskService的get_and_delete_task_data）
+        :param redis_client: Redis客户端实例
+        :param key: 目标键
+        :return: 键对应的值（字符串形式，无值返回空字符串）
+        """
+        try:
+            # value = redis_client.getdel(key)  # 原子操作
+            value = redis_client.get(key)  # 先获取值
+            redis_client.delete(key)  # 再删除键
+            return value
+
+        except Exception as e:
+            raise RedisException(RedisErrorCode.OPERATION_FAILED, f"获取并删除键失败: {str(e)}")

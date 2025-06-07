@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from redis import Redis
 from src.configs.redis_config import get_redis_client
-from src.services.redis_service import RedisCRUDService
+from src.services.redis_service import RedisBaseService
 from src.schemas.redis_schema import RedisKeyCreateRequest, RedisKeyUpdateRequest
 from src.schemas.response_schema import BaseResponse
 from src.exceptions.redis_exceptions import RedisException, RedisErrorCode
@@ -24,7 +24,7 @@ async def create_redis_key(
     request: RedisKeyCreateRequest,  # 使用Pydantic自动校验请求体
     redis_client: Redis = Depends(get_redis_client)
 ):
-    success = RedisCRUDService.create_key(redis_client, request.key, request.value)
+    success = RedisBaseService.create_key(redis_client, request.key, request.value)
     if not success:
         raise RedisException(RedisErrorCode.OPERATION_FAILED, "键创建失败")
     return BaseResponse(data={"key": request.key, "value": request.value})
@@ -41,7 +41,7 @@ async def get_redis_key(
     key: str, 
     redis_client: Redis = Depends(get_redis_client)
 ):
-    value = RedisCRUDService.get_key(redis_client, key)
+    value = RedisBaseService.get_key(redis_client, key)
     if not value:
         raise RedisException(RedisErrorCode.KEY_NOT_EXIST, "键不存在")
     return BaseResponse(data={"key": key, "value": value})
@@ -60,7 +60,7 @@ async def update_redis_key(
     request: RedisKeyUpdateRequest,  # 使用Pydantic请求体自动校验
     redis_client: Redis = Depends(get_redis_client)
 ):
-    success = RedisCRUDService.update_key(redis_client, key, request.new_value)
+    success = RedisBaseService.update_key(redis_client, key, request.new_value)
     if not success:
         raise RedisException(RedisErrorCode.OPERATION_FAILED, "键更新失败")
     return BaseResponse(data={"key": key, "new_value": request.new_value})
@@ -77,7 +77,7 @@ async def delete_redis_key(
     key: str, 
     redis_client: Redis = Depends(get_redis_client)
 ):
-    deleted = RedisCRUDService.delete_key(redis_client, key)
+    deleted = RedisBaseService.delete_key(redis_client, key)
     if deleted == 0:
         raise RedisException(RedisErrorCode.KEY_NOT_EXIST, "键不存在")
     return BaseResponse(data={"message": f"键 {key} 已删除"})
