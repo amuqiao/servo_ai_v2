@@ -7,17 +7,17 @@ networks:
 
 # 卷定义（持久化存储）
 volumes:
-  postgres_data_1:
+  postgres_data:
     driver: local
     driver_opts:
       type: none
-      device: ${PWD}/volumes/postgres  
+      device: ${PWD}/volumes/postgres  # Windows路径：e:/github_project/servo_ai_v2_project/servo_ai_v2/docker/volumes/postgres
       o: bind
-  redis_data_1:
+  redis_data:
     driver: local
     driver_opts:
       type: none
-      device: ${PWD}/volumes/redis  
+      device: ${PWD}/volumes/redis    # Windows路径：e:/github_project/servo_ai_v2_project/servo_ai_v2/docker/volumes/redis
       o: bind
 
 services:
@@ -27,7 +27,7 @@ services:
     networks:
       - servo_ai_v2_network
     volumes:
-      - postgres_data_1:/var/lib/postgresql/data  # 挂载数据卷
+      - postgres_data:/var/lib/postgresql/data  # 挂载数据卷
     environment:
       PGUSER: ${PGUSER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123456}
@@ -55,7 +55,7 @@ services:
     networks:
       - servo_ai_v2_network
     volumes:
-      - redis_data_1:/data   # 挂载数据卷（Redis默认持久化到/data）
+      - redis_data:/data   # 挂载数据卷（Redis默认持久化到/data）
     environment:
       REDISCLI_AUTH: ${REDIS_PASSWORD:-123456} # 与redis-cli兼容的认证变量（dify风格）
     command: redis-server --requirepass ${REDIS_PASSWORD:-123456} --appendonly yes --bind 0.0.0.0 # 明确绑定IPv4所有接口（可选修改）

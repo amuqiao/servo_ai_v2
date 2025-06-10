@@ -9,6 +9,8 @@ from src.celery_app.demo_tasks import process_demo_task
 
 
 class CeleryConfig(BaseSettings):
+    # 新增任务队列频道配置（与redis_celery_sub对齐）
+    CELERY_TASK_QUEUE_CHANNEL: str = "task_queue"
     """Celery 核心配置类（从环境变量或 .env 文件加载配置）"""
 
     # 消息代理地址（用于任务队列）
@@ -22,37 +24,36 @@ class CeleryConfig(BaseSettings):
     # 结果序列化格式（与任务序列化保持一致）
     CELERY_RESULT_SERIALIZER: str = "json"
     # 任务结果过期时间（秒），自动清理旧结果释放存储
-    CELERY_RESULT_EXPIRES: int = 3600
+    CELERY_RESULT_EXPIRES: int = 60  # 1分钟过期
     # 时区设置（任务时间展示使用上海时区）
     CELERY_TIMEZONE: str = "Asia/Shanghai"
     # 内部时间存储使用 UTC（避免时区转换问题）
     CELERY_ENABLE_UTC: bool = True
 
     # 高并发优化配置
-    CELERY_WORKER_CONCURRENCY: int = 4  # 每个Worker进程的并发任务数（默认4核机器）
-    CELERY_WORKER_PREFETCH_MULTIPLIER: int = (
-        1  # 限制每个Worker预取任务数（防止内存堆积）
-    )
+    CELERY_WORKER_CONCURRENCY: int = 4  # 每个Worker进程的并发任务数（默认2核机器）
+    CELERY_WORKER_AUTOSCALE: str = "8,4"  # 自动扩缩容（最大8个，最小2个Worker进程）
+    CELERY_WORKER_PREFETCH_MULTIPLIER: int = 2  # 预取任务数量（避免Worker空闲）
     CELERY_TASK_ACKS_LATE: bool = True  # 任务执行完成后再确认（避免Worker崩溃丢失任务）
-    CELERY_WORKER_AUTOSCALE: str = "8,2"  # 自动扩缩容（最大8个，最小2个Worker进程）
-    CELERY_TASK_QUEUES_MAX_LENGTH: int = 100  # 队列最大长度（需配合Broker配置生效）
+    CELERY_TASK_QUEUES_MAX_LENGTH: int = 5  # 队列最大长度（需配合Broker配置生效）
+    CELERY_TASK_TIME_LIMIT: int = 300  # 单个任务最大执行时间（秒）
 
     # 定时任务调度配置（键为任务名称，值为任务详情）
     CELERY_BEAT_SCHEDULE: Dict[str, Any] = {
-        # 新增：每分钟执行的 tasks.py 任务
-        # "log-current-time-task": {
-        #     "task": "celery_app.tasks.log_current_time",  # 与tasks.py中任务name一致
-        #     "schedule": 10,  # 调度间隔（秒），60秒=1分钟
-        # },
-        # # 新增：每分钟执行的 test_tasks.py 任务
-        # "log-test-time-task": {
-        #     "task": "celery_app.test_tasks.log_test_time",  # 与test_tasks.py中任务name一致
-        #     "schedule": 20,  # 调度间隔（秒）
-        # },
-        # 新增：每30秒扫描一次模拟任务
+        # 示例：每2小时执行一次任务
+        "log-current-time-task": {
+            "task": "celery_app.tasks.log_current_time",  # 与tasks.py中任务name一致
+            "schedule": 7200,  
+        },
+        # 每2小时执行一次测试任务
+        "log-test-time-task": {
+            "task": "celery_app.test_tasks.log_test_time",  # 与test_tasks.py中任务name一致
+            "schedule": 7200,  
+        },
+        # 每2小时执行一次demo任务
         "scan-demo-tasks": {
             "task": "celery_app.demo_tasks.scan_demo_tasks",  # 与demo_tasks中任务name一致
-            "schedule": 1000,  # 调度间隔（秒）
+            "schedule": 7200,  
         },
     }
 
@@ -93,7 +94,13 @@ app.conf.update(
     worker_prefetch_multiplier=config.CELERY_WORKER_PREFETCH_MULTIPLIER,  # 预取倍数
     task_acks_late=config.CELERY_TASK_ACKS_LATE,  # 延迟确认
     worker_autoscale=config.CELERY_WORKER_AUTOSCALE,  # 自动扩缩容
-    task_queues_max_length=config.CELERY_TASK_QUEUES_MAX_LENGTH,  # 队列长度限制（需Broker支持，Redis需额外配置maxmemory策略）
+    task_queues_max_length=config.CELERY_TASK_QUEUES_MAX_LENGTH,  # 队列长度限制
+    task_time_limit=config.CELERY_TASK_TIME_LIMIT,  # 任务最大执行时间
+    # 新增：自定义任务路由（确保任务被正确路由到指定队列）
+    task_routes={  
+        'celery_app.subscriber_tasks.process_task': {'queue': 'subscriber_queue'},
+        'celery_app.demo_tasks.process_demo_task': {'queue': 'demo_queue'},
+    }
 )
 
 # 自动发现任务模块（从 src.celery_app 包中查找 tasks.py
@@ -102,40 +109,5 @@ app.autodiscover_tasks(packages=["src.celery_app"], related_name="tasks")
 app.autodiscover_tasks(packages=["src.celery_app"], related_name="test_tasks")
 # 自动发现任务模块（新增对demo_tasks的扫描）
 app.autodiscover_tasks(packages=["src.celery_app"], related_name="demo_tasks")
-
-
-import threading
-import logging  # 新增：导入logging模块
-from redis import Redis
-import time  # 新增时间模块
-
-
-# def subscribe_demo_tasks():
-#     """订阅Redis频道，触发任务处理（支持异常后自动重连）"""
-#     logger = logging.getLogger("celery.task")
-#     while True:
-#         try:
-#             redis_generator = get_redis_client()
-#             redis_client = next(redis_generator)
-#             pubsub = redis_client.pubsub()
-#             pubsub.subscribe("demo_task_channel")  # 订阅固定频道
-#             logger.info("成功订阅demo_task_channel频道，开始监听消息...")
-
-#             for message in pubsub.listen():
-#                 if message["type"] == "message":  # 仅处理消息类型
-#                     # 修复：优先判断字符串类型，避免对str调用decode
-#                     task_key = message["data"] if isinstance(message["data"], str) else message["data"].decode('utf-8')
-#                     logger.info(f"收到新任务消息，键：{task_key}")
-#                     process_demo_task.apply_async(args=(task_key,))  # 异步触发处理任务
-#                 elif message["type"] == "subscribe":  # 订阅状态日志
-#                     logger.info(f"已订阅频道：{message['channel']}，当前订阅数：{message['data']}")
-#         except Exception as e:  # 异常捕获
-#             logger.error(f"订阅线程发生异常：{str(e)}，5秒后尝试重新订阅...", exc_info=True)
-#             time.sleep(5)
-#         finally:
-#             next(redis_generator, None)  # 归还连接
-
-# # 启动订阅线程（在Celery应用完成所有任务注册后执行）
-# @app.on_after_finalize.connect
-# def setup_subscriber(sender, **kwargs):
-#     threading.Thread(target=subscribe_demo_tasks, daemon=True).start()
+# 自动发现任务模块（新增对subscriber_tasks的扫描）
+app.autodiscover_tasks(packages=["src.celery_app"], related_name="subscriber_tasks")

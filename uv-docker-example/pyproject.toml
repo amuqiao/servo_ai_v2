@@ -8,6 +8,7 @@ dependencies = [
     "celery>=5.5.3",
     "fastapi[standard]>=0.112.2",
     "flower>=2.0.1",
+    "openai>=1.85.0",
     "psycopg[binary]>=3.2.9",
     "pydantic-settings>=2.9.1",
     "pymysql>=1.1.1",
@@ -28,6 +29,8 @@ dev-dependencies = [
     "fastapi-cli>=0.0.5",
     "pytest>=8.3.5",
     "pytest-cov>=6.1.1",
+    "pymupdf>=1.26.0",
+    "requests>=2.32.4",
 ]
 
 [[tool.uv.index]]

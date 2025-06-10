@@ -5,6 +5,7 @@ build/
 dist/
 wheels/
 *.egg-info
+**/.DS_Store
 
 # Virtual environments
 .venv
@@ -16,3 +17,8 @@ docker/volumes/postgres/*
 # 忽略 docker/volumes/redis 目录下的所有文件（保留目录）
 docker/volumes/redis/*
 !docker/volumes/redis/
+
+# 忽略celerybeat调度文件（避免本地状态提交到云端）
+uv-docker-example/celerybeat-schedule.bak
+uv-docker-example/celerybeat-schedule.dat
+uv-docker-example/celerybeat-schedule.dir
