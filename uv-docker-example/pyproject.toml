@@ -16,6 +16,7 @@ dependencies = [
     "sqlalchemy>=2.0.41",
     "ttkbootstrap>=1.13.10",
     "requests>=2.32.4",
+     "PyQt5>=5.15.9",
 ]
 
 [build-system]

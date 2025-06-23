@@ -43,6 +43,7 @@ class ApiConfig(BaseSettings):
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)  # MySQL配置
     redis: RedisConfig = Field(default_factory=RedisConfig)          # Redis配置
     postgres: PostgresConfig = Field(default_factory=PostgresConfig)  # 新增：PostgreSQL配置
+    api_base_url: str = Field("http://localhost:8000", alias="API_BASE_URL", description="API服务基础URL")  # 新增字段
 
     model_config = SettingsConfigDict(
         env_file=".env",

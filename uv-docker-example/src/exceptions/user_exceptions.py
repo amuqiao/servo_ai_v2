@@ -1,25 +1,22 @@
 from enum import Enum
-from fastapi import HTTPException
+from fastapi import status, HTTPException
+from .common_exceptions import CommonErrorCode  # 导入通用码
+from typing import Dict, Any, Optional
 
 
 class UserErrorCode(Enum):
-    USER_NOT_EXIST = 40401  # HTTP 404 + 业务子码
-    USERNAME_EXIST = 40001  # HTTP 400 + 业务子码
-    EMAIL_EXIST = 40002
+    # 业务专属错误码（不包含通用码）
+    USER_NOT_EXIST = 40401  # 用户不存在
+    USERNAME_EXIST = 40001  # 用户名已存在
+    EMAIL_EXIST = 40002  # 邮箱已注册
 
 
 class UserException(HTTPException):
-    def __init__(self, code: UserErrorCode, detail: str):
-        # 从业务错误码中提取HTTP状态码（前两位），如40401→404
-        status_code = code.value // 100
-        super().__init__(status_code=status_code, detail=detail)
-        self.code = code.value  # 保留完整业务错误码
-        self.message = detail  # 兼容前端获取消息
-
-
-class UserNotFoundException(UserException):
-    def __init__(self, user_id: int):
-        super().__init__(
-            code=UserErrorCode.USER_NOT_EXIST,
-            detail=f"用户ID {user_id} 不存在"
-        )
+    def __init__(self,
+                 code: CommonErrorCode | UserErrorCode,
+                 message: str,
+                 details: Optional[Dict[str, Any]] = None):
+        super().__init__(status_code=code.value // 100, detail=message)
+        self.code = code.value
+        self.message = message  
+        self.details = details

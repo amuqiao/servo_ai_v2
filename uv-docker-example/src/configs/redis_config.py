@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from src.exceptions.redis_exceptions import RedisException, RedisErrorCode
 from redis import Redis, ConnectionPool
 from src.configs import ApiConfig
 import logging
@@ -41,13 +42,17 @@ def get_redis_client() -> Redis:
     client = Redis(connection_pool=pool)
     try:
         yield client
+    except (ConnectionError, TimeoutError) as e:
+        # 仅处理连接相关异常
+        logger.error(f"Redis 连接异常: {str(e)}")
+        raise RedisException(
+            code=RedisErrorCode.OPERATION_FAILED,
+            message="Redis 服务不可用",
+            details={"error": str(e)}
+        )
     except Exception as e:
-        # 优化：区分连接错误与操作错误
-        if isinstance(e, (ConnectionError, TimeoutError)):
-            logger.error(f"Redis 连接异常: {str(e)}")
-            raise HTTPException(status_code=503, detail="Redis 服务不可用")
-        else:
-            logger.error(f"Redis 操作异常: {str(e)}")
-            raise HTTPException(status_code=500, detail="Redis 操作失败")
+        # 其他异常（如业务异常）直接向上传递
+        logger.error(f"Redis 操作异常: {str(e)}")
+        raise
     finally:
         client.close()  # 归还连接到池（非真正关闭）

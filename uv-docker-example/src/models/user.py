@@ -17,6 +17,6 @@ class User(Base):
             "id": self.id,
             "username": self.username,
             "email": self.email,
-            "created_at": self.created_at.isoformat(),  # 新增：时间格式化为ISO字符串
-            "updated_at": self.updated_at.isoformat()  # 新增：更新时间格式化为ISO字符串
+            "created_at": self.created_at.isoformat(),  
+            "updated_at": self.updated_at.isoformat()  
         }

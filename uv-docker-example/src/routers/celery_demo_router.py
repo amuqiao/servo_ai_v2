@@ -3,7 +3,7 @@ from redis import Redis
 from src.configs.redis_config import get_redis_client
 from src.celery_app.app import CeleryConfig
 from src.services.redis_service import RedisBaseService
-from src.schemas.response_schema import BaseResponse
+from src.schemas.response_schema import SuccessResponse, ErrorResponse
 from src.schemas.celery_schema import DemoTaskRequest, BatchDemoTaskRequest,GenerateTasksRequest  # 新增Pydantic模型
 import uuid
 import json  # 新增JSON模块导入
@@ -11,18 +11,18 @@ import json  # 新增JSON模块导入
 router = APIRouter(
     prefix="/demo-tasks",
     tags=["Celery 模拟任务"],
-    responses={404: {"description": "资源未找到"}}
+    responses={404: {"description": "资源未找到", "model": ErrorResponse}, 400: {"description": "参数错误", "model": ErrorResponse}, 500: {"description": "服务器错误", "model": ErrorResponse}}
 )
 
 def _generate_task_key() -> str:
     """公共方法：生成符合扫描规则的任务键"""
     return f"demo_task_{str(uuid.uuid4())}"
 
-@router.post("/trigger", 
+@router.post("/create", 
              summary="触发单个模拟任务", 
-             response_model=BaseResponse,
+             response_model=SuccessResponse,
              description="向Redis插入单个模拟任务数据，由Celery定时扫描处理")
-async def trigger_demo_task(
+async def create_pending_task(
     request: DemoTaskRequest,  # 改为Pydantic模型验证
     redis_client: Redis = Depends(get_redis_client)
 ):
@@ -30,32 +30,14 @@ async def trigger_demo_task(
     
     success = RedisBaseService.create_key(redis_client, task_key, json.dumps(request.task_data))
     if not success:
-        return BaseResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="任务触发失败")
-    return BaseResponse(message=f"任务已触发，键：{task_key}")
-
-@router.post("/trigger_subscribe",  # 新增订阅触发接口 
-             summary="触发单个模拟订阅任务", 
-             response_model=BaseResponse,
-             description="向Redis插入单个模拟任务数据，由Celery订阅触发处理")
-async def trigger_subscribe_demo_task(
-    request: DemoTaskRequest,  # 改为Pydantic模型验证
-    redis_client: Redis = Depends(get_redis_client)
-):
-    task_key = _generate_task_key()
-    
-    success = RedisBaseService.create_key(redis_client, task_key, json.dumps(request.task_data))
-    if not success:
-        return BaseResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="任务触发失败")
-    
-    # 新增：发布任务键到Redis频道
-    redis_client.publish("demo_task_channel", task_key)  # 发布到固定频道
-    return BaseResponse(message=f"任务已触发并发布，键：{task_key}")
+        return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="任务触发失败", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, details=None)
+    return SuccessResponse(message=f"任务已触发，键：{task_key}", data=None)
 
 
-@router.post("/publish_queue",
-             summary="发布任务到订阅队列",
-             response_model=BaseResponse)
-async def publish_to_queue(
+@router.post("/queue/single",
+             summary="发布单个任务到订阅队列",
+             response_model=SuccessResponse)
+async def publish_single_task(
     request: DemoTaskRequest,
     redis_client: Redis = Depends(get_redis_client)
 ):
@@ -67,13 +49,13 @@ async def publish_to_queue(
         config.CELERY_TASK_QUEUE_CHANNEL,
         json.dumps(request.task_data)
     )
-    return BaseResponse(message="任务已发布到订阅队列")
+    return SuccessResponse(message="任务已发布到订阅队列", data=None)
 
 
-@router.post("/generate-random-tasks",
-             summary="生成并发布随机任务",
-             response_model=BaseResponse)
-async def generate_random_tasks(
+@router.post("/queue/generate_random",
+             summary="生成并发布随机任务到订阅队列",
+             response_model=SuccessResponse)
+async def generate_random_and_publish_tasks(
     request: GenerateTasksRequest,
     redis_client: Redis = Depends(get_redis_client)
 ):
@@ -95,13 +77,13 @@ async def generate_random_tasks(
             json.dumps(task_data)
         )
     
-    return BaseResponse(message=f"成功生成并发布'{request.count}'个{request.task_type}类型的随机任务")
+    return SuccessResponse(message=f"成功生成并发布'{request.count}'个{request.task_type}类型的随机任务", data=None)
 
 
-@router.post("/publish-batch-queue",
+@router.post("/queue/batch",
              summary="批量发布任务到订阅队列",
-             response_model=BaseResponse)
-async def publish_batch_to_queue(
+             response_model=SuccessResponse)
+async def publish_batch_tasks(
     request: BatchDemoTaskRequest,
     redis_client: Redis = Depends(get_redis_client)
 ):
@@ -116,4 +98,4 @@ async def publish_batch_to_queue(
             config.CELERY_TASK_QUEUE_CHANNEL,
             json.dumps(task_data)
         )
-    return BaseResponse(message=f"{len(request.task_data_list)}个任务已批量发布到订阅队列")
+    return SuccessResponse(message=f"{len(request.task_data_list)}个任务已批量发布到订阅队列", data=None)

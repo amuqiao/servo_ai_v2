@@ -1,16 +1,16 @@
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime  # 新增：时间类型
-from src.schemas.response_schema import BaseResponse  # 复用标准响应体
+from src.schemas.response_schema import BaseResponse, SuccessResponse, ErrorResponse
 
 # 请求模型：创建用户
 class UserCreate(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50, example="alice")
+    username: str = Field(..., min_length=2, max_length=50, example="alice")
     email: EmailStr = Field(..., example="alice@example.com")
 
 # 请求模型：更新用户
 class UserUpdate(BaseModel):
     email: EmailStr | None = Field(example="new_alice@example.com")  # 允许不修改邮箱
-    username: str | None = Field(min_length=3, max_length=50, example="new_alice")  # 与模型层长度一致
+    username: str | None = Field(None, min_length=2, max_length=50, example="张三")  # 明确允许None值，仅当提供时验证长度
 
 # 响应模型：用户详情（补充 updated_at 字段）
 class UserResponse(BaseModel):
@@ -24,9 +24,9 @@ class UserResponse(BaseModel):
         orm_mode = True  # 支持从ORM对象转换
 
 # 响应模型：用户列表（继承BaseResponse，明确data类型）
-class UserListResponse(BaseResponse):
+# 原 UserListResponse 和 UserDetailResponse 调整
+class UserListResponse(SuccessResponse):  # 继承 SuccessResponse（含 data 字段）
     data: list[UserResponse] | None = None
 
-# 响应模型：单个用户详情（继承BaseResponse，明确data类型）
-class UserDetailResponse(BaseResponse):
+class UserDetailResponse(SuccessResponse):  # 继承 SuccessResponse（含 data 字段）
     data: UserResponse | None = None
