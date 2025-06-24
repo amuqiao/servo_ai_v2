@@ -7,6 +7,8 @@ from src.schemas.response_schema import SuccessResponse, ErrorResponse
 from src.schemas.celery_schema import DemoTaskRequest, BatchDemoTaskRequest,GenerateTasksRequest  # 新增Pydantic模型
 import uuid
 import json  # 新增JSON模块导入
+from src.services.task_service import TaskService
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter(
     prefix="/demo-tasks",
@@ -41,15 +43,21 @@ async def publish_single_task(
     request: DemoTaskRequest,
     redis_client: Redis = Depends(get_redis_client)
 ):
-    config = CeleryConfig()  # 加载Celery配置
+    config = CeleryConfig()
     if not redis_client.ping():
         raise HTTPException(status_code=500, detail="Redis连接失败")
-    # 发布任务数据到TASK_QUEUE_CHANNEL
-    redis_client.publish(
-        config.CELERY_TASK_QUEUE_CHANNEL,
-        json.dumps(request.task_data)
-    )
-    return SuccessResponse(message="任务已发布到订阅队列", data=None)
+    
+    # 使用TaskService创建并发布任务，支持传递task_id
+    try:
+        task = TaskService.create_task(
+            task_type=request.task_data.get("task_type"),
+            content=request.task_data.get("content"),
+            task_id=request.task_data.get("task_id")  # 新增传递task_id
+        )
+        TaskService.publish_task(task, redis_client)
+        return SuccessResponse(message=f"任务已发布到订阅队列，ID: {task.task_id}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/queue/generate_random",
@@ -59,25 +67,23 @@ async def generate_random_and_publish_tasks(
     request: GenerateTasksRequest,
     redis_client: Redis = Depends(get_redis_client)
 ):
-    config = CeleryConfig()  # 加载Celery配置
+    config = CeleryConfig()
     if not redis_client.ping():
         raise HTTPException(status_code=500, detail="Redis连接失败")
     
-    # 生成随机任务数据
     generated_tasks = []
     for i in range(request.count):
-        task_data = {
-            "task_type": request.task_type,
-            "task_id": str(uuid.uuid4()),
-            "content": f"随机内容_{i+1}"
-        }
-        generated_tasks.append(task_data)
-        redis_client.publish(
-            config.CELERY_TASK_QUEUE_CHANNEL,
-            json.dumps(task_data)
+        # 使用TaskService创建任务
+        task = TaskService.create_task(
+            task_type=request.task_type,
+            content=f"随机内容_{i+1}"
         )
+        generated_tasks.append(task)
+        TaskService.publish_task(task, redis_client)
     
-    return SuccessResponse(message=f"成功生成并发布'{request.count}'个{request.task_type}类型的随机任务", data=None)
+    return SuccessResponse(
+        message=f"成功生成并发布'{request.count}'个{request.task_type}类型的随机任务"
+    )
 
 
 @router.post("/queue/batch",

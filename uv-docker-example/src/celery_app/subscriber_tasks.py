@@ -5,6 +5,7 @@ import logging
 from src.celery_app import app
 from src.configs.redis_config import get_redis_client
 from src.celery_app.app import CeleryConfig
+from src.services.task_service import TaskService
 
 # 初始化Celery任务专用日志器
 logger = logging.getLogger("celery")
@@ -41,14 +42,19 @@ def start_redis_subscriber(sender, **kwargs):
     import threading
     threading.Thread(target=listen_for_messages, daemon=True).start()
     
-@app.task(bind=True, default_retry_delay=300, max_retries=5) 
+@app.task(bind=True, default_retry_delay=300, max_retries=5)
 def process_task(self, task_data):
-    task_type = task_data.get("task_type")
-    content = task_data.get("content")
-    worker_id = self.request.hostname  # 获取当前Worker的ID
-    logger.info(f"Worker {worker_id} 领取任务，类型：{task_type}，数据：{content}")
-
-    # 保持原任务逻辑（数据处理/邮件通知等）
-    if task_type == "data_processing":
-        time.sleep(10)
-        return {"status": "processed", "result": content}
+    try:
+        # 使用TaskService解析任务
+        logger.info(f"TaskService解析任务")
+        task = TaskService.parse_task(task_data)
+        worker_id = self.request.hostname
+        logger.info(f"Worker {worker_id} 领取任务，类型：{task.task_type}，ID：{task.task_id}")
+        
+        # 调用任务自身的process方法
+        result = task.process()
+        logger.info(f"任务处理完成，ID：{task.task_id}，结果：{result}")
+        return result
+    except Exception as e:
+        logger.error(f"任务处理失败: {str(e)}", exc_info=True)
+        self.retry(exc=e)
