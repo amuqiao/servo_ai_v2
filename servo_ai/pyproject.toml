@@ -1,5 +1,5 @@
 [project]
-name = "uv-docker-example"
+name = "servo_ai"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -14,9 +14,8 @@ dependencies = [
     "pymysql>=1.1.1",
     "redis>=6.2.0",
     "sqlalchemy>=2.0.41",
-    "ttkbootstrap>=1.13.10",
     "requests>=2.32.4",
-     "PyQt5>=5.15.9",
+    "pymupdf>=1.26.0",
 ]
 
 [build-system]
@@ -32,7 +31,6 @@ dev-dependencies = [
     "fastapi-cli>=0.0.5",
     "pytest>=8.3.5",
     "pytest-cov>=6.1.1",
-    "pymupdf>=1.26.0",
 ]
 
 [[tool.uv.index]]

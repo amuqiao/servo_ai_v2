@@ -1,9 +1,9 @@
 import logging
 from typing import Dict, Any
-from ..tools.pdf2image import PdfToImageConverter
-from ..tools.ocr_cert import OCRCertInfoExtractor
+from src.tools.pdf2image import PdfToImageConverter
+from src.tools.ocr_cert import OCRCertInfoExtractor
 from io import BytesIO
-from .base_task import BaseTask
+from src.services.tasks.base_task import BaseTask
 
 # 初始化任务专用日志器
 logger = logging.getLogger("celery")
