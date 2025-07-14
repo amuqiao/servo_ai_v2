@@ -24,7 +24,7 @@ class CeleryConfig(BaseSettings):
     # 结果序列化格式（与任务序列化保持一致）
     CELERY_RESULT_SERIALIZER: str = "json"
     # 任务结果过期时间（秒），自动清理旧结果释放存储
-    CELERY_RESULT_EXPIRES: int = 60  # 1分钟过期
+    CELERY_RESULT_EXPIRES: int = 3600
     # 时区设置（任务时间展示使用上海时区）
     CELERY_TIMEZONE: str = "Asia/Shanghai"
     # 内部时间存储使用 UTC（避免时区转换问题）
@@ -38,22 +38,31 @@ class CeleryConfig(BaseSettings):
     CELERY_TASK_QUEUES_MAX_LENGTH: int = 5  # 队列最大长度（需配合Broker配置生效）
     CELERY_TASK_TIME_LIMIT: int = 300  # 单个任务最大执行时间（秒）
 
+    # old
+    CELERY_SCAN_TASKS_INTERVAL: int  # 移除默认值，仅声明类型
+    # 新增：单次扫描最大任务数（防止单次扫描量过大，无默认值，必填）
+    CELERY_SCAN_BATCH_SIZE: int     # 移除默认值，仅声明类型
+    # 新增：连接池大小（默认无连接池，频繁创建连接易断开）
+    CELERY_BROKER_POOL_LIMIT: int  # 无默认值，从环境变量获取
+    # 新增：每个 Worker 预取任务数（根据任务耗时调整）
+    CELERY_WORKER_PREFETCH_MULTIPLIER: int  # 无默认值，从环境变量获取
+
     # 定时任务调度配置（键为任务名称，值为任务详情）
     CELERY_BEAT_SCHEDULE: Dict[str, Any] = {
         # 示例：每2小时执行一次任务
         "log-current-time-task": {
             "task": "celery_app.tasks.log_current_time",  # 与tasks.py中任务name一致
-            "schedule": 7200,  
+            "schedule": 7200,
         },
         # 每2小时执行一次测试任务
         "log-test-time-task": {
             "task": "celery_app.test_tasks.log_test_time",  # 与test_tasks.py中任务name一致
-            "schedule": 7200,  
+            "schedule": 7200,
         },
         # 每2小时执行一次demo任务
         "scan-demo-tasks": {
             "task": "celery_app.demo_tasks.scan_demo_tasks",  # 与demo_tasks中任务name一致
-            "schedule": 7200,  
+            "schedule": 7200,
         },
     }
 
@@ -91,13 +100,19 @@ app.conf.update(
     worker_hijack_root_logger=False,  # 禁止 Celery 覆盖根日志器（保留 FastAPI 日志）
     worker_redirect_stdouts=False,  # 禁止 Celery 重定向标准输出（避免日志混乱）
     worker_concurrency=config.CELERY_WORKER_CONCURRENCY,  # 并发任务数
+
+    # 新增连接池与重试配置
+    broker_pool_limit=config.CELERY_BROKER_POOL_LIMIT,  # 从环境变量获取
+    broker_connection_retry_on_startup=True,  # 启动时自动重试连接 Redis
+    broker_connection_max_retries=10,         # 最大重试次数
+
     worker_prefetch_multiplier=config.CELERY_WORKER_PREFETCH_MULTIPLIER,  # 预取倍数
     task_acks_late=config.CELERY_TASK_ACKS_LATE,  # 延迟确认
     worker_autoscale=config.CELERY_WORKER_AUTOSCALE,  # 自动扩缩容
     task_queues_max_length=config.CELERY_TASK_QUEUES_MAX_LENGTH,  # 队列长度限制
     task_time_limit=config.CELERY_TASK_TIME_LIMIT,  # 任务最大执行时间
     # 新增：自定义任务路由（确保任务被正确路由到指定队列）
-    task_routes={  
+    task_routes={
         'celery_app.subscriber_tasks.process_task': {'queue': 'subscriber_queue'},
         'celery_app.demo_tasks.process_demo_task': {'queue': 'demo_queue'},
     }
@@ -111,3 +126,6 @@ app.autodiscover_tasks(packages=["src.celery_app"], related_name="test_tasks")
 app.autodiscover_tasks(packages=["src.celery_app"], related_name="demo_tasks")
 # 自动发现任务模块（新增对subscriber_tasks的扫描）
 app.autodiscover_tasks(packages=["src.celery_app"], related_name="subscriber_tasks")
+
+app.autodiscover_tasks(packages=['src.celery_app'], related_name='test_tasks')
+app.autodiscover_tasks(packages=['src.celery_app'], related_name='ocr_tasks')
